@@ -1,13 +1,10 @@
 /**
  * 채팅하기
  * 
- * 일대일 채팅하기
- * 
- * 'login' 이벤트 처리
- * 'message' 이벤트 처리할 때 대상 소켓 찾아서 전송
+ * Socket.IO를 이용한 일대일 채팅과 그룹 채팅
  *
- * @date 2016-11-10
- * @author Mike
+ * @date 2018-07-20
+ * 
  */
  
 
@@ -49,7 +46,6 @@ var route_loader = require('./routes/route_loader');
 var socketio = require('socket.io');
 
 // cors 사용 - 클라이언트에서 ajax로 요청 시 CORS(다중 서버 접속) 지원
-//하나의 클라이언트에서 여러 서버에 접속하여 다양한 데이터를 가져오기 위해 사용
 var cors = require('cors');
 
 
@@ -163,71 +159,28 @@ var server = http.createServer(app).listen(app.get('port'), function(){
 
 //===== Socket.IO를 이용한 채팅 테스트 부분 =====//
 
-
-// 로그인 아이디 매핑 (로그인 ID -> 소켓 ID)
-var login_ids = {};
-
-
-// socket.io 서버를 시작합니다.
+//socket.io 서버를 시작합니다.
 var io = socketio.listen(server);
 console.log('socket.io 요청을 받아들일 준비가 되었습니다.');
 
-// 클라이언트가 연결했을 때의 이벤트 처리
+//클라이언트가 연결했을 때의 이벤트 처리
 io.sockets.on('connection', function(socket) {
 	console.log('connection info :', socket.request.connection._peername);
 
-    // 소켓 객체에 클라이언트 Host, Port 정보 속성으로 추가
-    socket.remoteAddress = socket.request.connection._peername.address;
-    socket.remotePort = socket.request.connection._peername.port;
+	// 소켓 객체에 클라이언트 Host, Port 정보 속성으로 추가
+	socket.remoteAddress = socket.request.connection._peername.address;
+	socket.remotePort = socket.request.connection._peername.port;
     
-
-    // 'login' 이벤트를 받았을 때의 처리
-    socket.on('login', function(login) {
-    	console.log('login 이벤트를 받았습니다.');
-    	console.dir(login);
-
-        // 기존 클라이언트 ID가 없으면 클라이언트 ID를 맵에 추가
-        console.log('접속한 소켓의 ID : ' + socket.id);
-        login_ids[login.id] = socket.id;
-        socket.login_id = login.id;
-
-        console.log('접속한 클라이언트 ID 갯수 : %d', Object.keys(login_ids).length);
-
-        // 응답 메시지 전송
-        sendResponse(socket, 'login', '200', '로그인되었습니다.');
-    });
-
-    
-    // 'message' 이벤트를 받았을 때의 처리
-    socket.on('message', function(message) {
-    	console.log('message 이벤트를 받았습니다.');
-    	console.dir(message);
-    	
-        if (message.recepient =='ALL') {
-            // 나를 포함한 모든 클라이언트에게 메시지 전달
-        	console.dir('나를 포함한 모든 클라이언트에게 message 이벤트를 전송합니다.')
-            io.sockets.emit('message', message);
-        } else {
-        	// 일대일 채팅 대상에게 메시지 전달
-        	if (login_ids[message.recepient]) {
-        		io.sockets.connected[login_ids[message.recepient]].emit('message', message);
-        		
-        		// 응답 메시지 전송
-                sendResponse(socket, 'message', '200', '메시지를 전송했습니다.');
-        	} else {
-        		// 응답 메시지 전송
-                sendResponse(socket, 'login', '404', '상대방의 로그인 ID를 찾을 수 없습니다.');
-        	}
+    //'message' 이벤트를 받았을 때의 처리
+    socket.on('message',function(message){
+        console.log('message 이벤트를 받았습니다.');
+        console.dir(message);
+        
+        if(message.recepient=='ALL'){
+            //나를 포함한 모든 클라이언트에게 메시지 전달
+            console.log('나를 포함한 모든 클라이언트에게 message 이벤트를 전송합니다.')
+            io.sockets.emit('message',message);
         }
     });
-    
 });
-
-
-// 응답 메시지 전송 메소드
-function sendResponse(socket, command, code, message) {
-	var statusObj = {command: command, code: code, message: message};
-	socket.emit('response', statusObj);
-}
-
 
